@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Package, MapPin, Calendar, ClipboardList, Send, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { ShipmentStatus } from '../types';
 import { cn } from '../lib/utils';
 
@@ -22,10 +22,13 @@ export default function AdminAddShipment() {
     destination: '',
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!auth.currentUser) {
-      alert("You must be signed in as an admin to perform this action.");
+      setError("You must be signed in as an admin to perform this action.");
       return;
     }
     
@@ -38,8 +41,14 @@ export default function AdminAddShipment() {
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'shipments/' + formData.trackingNumber);
+    } catch (err: any) {
+      console.error("Submission failed:", err);
+      setError(err.message || "Failed to register shipment. Check permissions.");
+      try {
+        handleFirestoreError(err, OperationType.WRITE, 'shipments/' + formData.trackingNumber);
+      } catch (logErr) {
+        // Log error already happened in handleFirestoreError
+      }
     } finally {
       setLoading(false);
     }
@@ -55,6 +64,11 @@ export default function AdminAddShipment() {
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {error && (
+              <div className="md:col-span-2 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium text-center">
+                {error}
+              </div>
+            )}
             {/* Tracking ID */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tracking Number</label>

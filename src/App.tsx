@@ -8,7 +8,7 @@ import Sidebar from './components/Sidebar';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Bell, HelpCircle } from 'lucide-react';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Shipments = lazy(() => import('./pages/Shipments'));
@@ -30,6 +30,12 @@ export default function App() {
     };
     handleLocation();
     window.addEventListener('hashchange', handleLocation);
+    
+    // Handle redirect result
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect auth error:", error);
+    });
+
     return () => window.removeEventListener('hashchange', handleLocation);
   }, []);
 

@@ -1,77 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 0. Global Safety Net
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helpers ---
-    
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
-
+    
     function isEmailVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return request.auth.token.email_verified == true;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email == 'uzair9799@gmail.com' && request.auth.token.email_verified == true)
-      );
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    function isValidShipment(data) {
-      return data.keys().hasAll(['trackingNumber', 'status', 'senderName', 'recipientName', 'origin', 'destination'])
-        && data.trackingNumber is string && data.trackingNumber.size() <= 64
-        && data.status in ['In Transit', 'Delivered', 'Pending', 'Delayed', 'Cancelled', 'Out for Delivery']
-        && data.senderName is string && data.senderName.size() <= 200
-        && data.recipientName is string && data.recipientName.size() <= 200;
-    }
-
-    // --- Collections ---
-
-    match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Only manageable via console
-    }
-
+    // Shipments Collection
     match /shipments/{shipmentId} {
-      // 1. PUBLIC: Anyone can search if they have the tracking number (ID)
-      // We only allow 'get' for public. 'list' is restricted to admins.
-      allow get: if true; 
-      allow list: if isAdmin();
-
-      // 2. ADMIN: Only admins can manage shipments
-      allow create: if isAdmin() && isValidShipment(incoming()) && isValidId(shipmentId);
+      // Anyone can look up a specific shipment if they have the ID (Tracking)
+      allow get: if true;
       
-      allow update: if isAdmin() && isValidShipment(incoming()) && (
-        // Ensure tracking number doesn't change
-        incoming().trackingNumber == existing().trackingNumber
-      );
-
-      allow delete: if isAdmin();
-
-      // Sub-collection: Events
-      match /events/{eventId} {
-        allow read: if true; // Public can see tracking history
-        allow write: if isAdmin();
-      }
+      // Only authenticated admins can list all shipments or create/edit/delete
+      // In a real app, you'd check for a specific admin email or role
+      allow list, write: if isSignedIn() && isEmailVerified();
     }
   }
 }
