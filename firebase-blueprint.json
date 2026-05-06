@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "Shipment": {
+      "title": "Shipment",
+      "description": "Core shipment data for Indian Delivery Ltd",
+      "type": "object",
+      "properties": {
+        "trackingNumber": { "type": "string", "description": "Unique tracking ID" },
+        "senderName": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "status": { "type": "string" },
+        "lastUpdatedLocation": { "type": "string" },
+        "remarks": { "type": "string" },
+        "lastUpdatedDate": { "type": "string", "format": "date-time" },
+        "estimatedDeliveryDate": { "type": "string", "format": "date-time" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["trackingNumber", "status"]
+    }
+  },
+  "firestore": {
+    "/shipments": {
+      "schema": "Shipment",
+      "description": "Collection of all shipments"
+    },
+    "/shipments/{shipmentId}/events": {
+      "schema": {
+        "title": "TrackingEvent",
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "location": { "type": "string" },
+          "remarks": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "description": "History of tracking events for a shipment"
+    }
+  }
+}
