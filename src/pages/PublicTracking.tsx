@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, MapPin, Truck, Calendar, Clock, AlertCircle, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Truck, Calendar, Clock, AlertCircle, ArrowRight, User, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -166,6 +166,29 @@ export default function PublicTracking() {
                     </div>
                   </div>
                </div>
+            </div>
+
+            {/* Sender and Recipient Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 backdrop-blur-md flex items-center gap-5">
+                <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 shrink-0">
+                  <User className="text-zinc-400" size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest leading-none mb-1">Sender</p>
+                  <p className="text-white font-bold text-lg">{shipment.senderName}</p>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 backdrop-blur-md flex items-center gap-5">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shrink-0">
+                  <UserCheck className="text-orange-500" size={24} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest leading-none mb-1">Recipient</p>
+                  <p className="text-white font-bold text-lg">{shipment.recipientName}</p>
+                </div>
+              </div>
             </div>
 
             {/* Path visualization */}

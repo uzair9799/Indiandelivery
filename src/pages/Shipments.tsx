@@ -1,15 +1,144 @@
-import { Search, Filter, MoreHorizontal, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Search, Filter, MoreHorizontal, ArrowRight, ExternalLink, Loader2, Edit2, X, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import { Shipment, ShipmentStatus } from '../types';
 import { onAuthStateChanged } from 'firebase/auth';
 
+const STATUS_OPTIONS: ShipmentStatus[] = ['Pending', 'In Transit', 'Out for Delivery', 'Delivered', 'Delayed', 'Cancelled'];
+
+interface EditModalProps {
+  shipment: Shipment;
+  onClose: () => void;
+  onSave: (updatedShipment: Shipment) => void;
+}
+
+function EditShipmentModal({ shipment, onClose, onSave }: EditModalProps) {
+  const [formData, setFormData] = useState<Shipment>({ ...shipment });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const shipmentRef = doc(db, 'shipments', shipment.id);
+      const updateData = {
+        ...formData,
+        lastUpdatedDate: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+      };
+      // Remove id from update data
+      const { id, ...dataToSave } = updateData;
+      
+      await updateDoc(shipmentRef, dataToSave);
+      onSave(updateData);
+      onClose();
+    } catch (err: any) {
+      console.error("Update failed:", err);
+      setError(err.message || "Failed to update shipment");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
+      >
+        <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <Edit2 size={20} className="text-orange-500" />
+            Edit Shipment: <span className="text-orange-500">{shipment.trackingNumber}</span>
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-medium text-center">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Status</label>
+              <select 
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as ShipmentStatus })}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              >
+                {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Current Location</label>
+              <input 
+                type="text"
+                value={formData.lastUpdatedLocation}
+                onChange={(e) => setFormData({ ...formData, lastUpdatedLocation: e.target.value })}
+                placeholder="City, Country"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-zinc-600"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Estimated Delivery</label>
+              <input 
+                type="date"
+                value={formData.estimatedDeliveryDate}
+                onChange={(e) => setFormData({ ...formData, estimatedDeliveryDate: e.target.value })}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Activity/Remarks</label>
+              <textarea 
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                rows={3}
+                placeholder="Briefly describe the current activity..."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-zinc-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-900/50 flex justify-end gap-3">
+          <button 
+            onClick={onClose}
+            className="px-6 py-2 rounded-xl text-sm font-bold text-zinc-400 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-orange-950 font-bold text-sm flex items-center gap-2 transition-all active:scale-95"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function Shipments() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -134,11 +263,15 @@ export default function Shipments() {
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button 
+                        onClick={() => setEditingShipment(shipment)}
+                        className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-orange-500 transition-colors"
+                        title="Edit Shipment"
+                      >
+                        <Edit2 size={16} />
+                      </button>
                        <button className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors">
                         <ExternalLink size={16} />
-                      </button>
-                      <button className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors">
-                        <MoreHorizontal size={16} />
                       </button>
                     </div>
                   </td>
@@ -161,6 +294,18 @@ export default function Shipments() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {editingShipment && (
+          <EditShipmentModal 
+            shipment={editingShipment}
+            onClose={() => setEditingShipment(null)}
+            onSave={(updated) => {
+              setShipments(prev => prev.map(s => s.id === updated.id ? updated : s));
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
