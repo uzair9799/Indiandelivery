@@ -1,7 +1,7 @@
-import { Search, Filter, MoreHorizontal, ArrowRight, ExternalLink, Loader2, Edit2, X, Save } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, ArrowRight, ExternalLink, Loader2, Edit2, X, Save, History, Clock, User as UserIcon, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, updateDoc, serverTimestamp, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import { Shipment, ShipmentStatus } from '../types';
@@ -9,6 +9,116 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { OWNER_EMAIL } from '../constants';
 
 const STATUS_OPTIONS: ShipmentStatus[] = ['Pending', 'In Transit', 'Out for Delivery', 'Delivered', 'Delayed', 'Cancelled', 'In Warehouse'];
+
+interface AuditTrailModalProps {
+  shipment: Shipment;
+  onClose: () => void;
+}
+
+function AuditTrailModal({ shipment, onClose }: AuditTrailModalProps) {
+  const getCreatedDate = () => {
+    const date = (shipment as any).createdAt;
+    return date?.toDate ? date.toDate() : new Date(date || Date.now());
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl shadow-orange-500/10"
+      >
+        <div className="px-8 py-6 border-b border-zinc-900 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center gap-3">
+              <History className="text-orange-500" size={24} />
+              Audit Trail
+            </h3>
+            <p className="text-zinc-500 text-xs font-bold mt-1 tracking-widest uppercase">{shipment.trackingNumber}</p>
+          </div>
+          <button onClick={onClose} className="p-3 hover:bg-zinc-900 rounded-full text-zinc-500 hover:text-white transition-all">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          <div className="relative space-y-8 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-orange-500/50 before:via-zinc-800 before:to-transparent">
+            
+            {/* Creation Entry */}
+            <div className="relative flex items-start gap-6 group">
+              <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-orange-500 border-4 border-zinc-950 z-10 shrink-0 shadow-lg shadow-orange-500/20">
+                <Package size={18} className="text-orange-950" />
+              </div>
+              <div className="pt-2">
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-xs font-black bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-md uppercase tracking-tighter">Initial Creation</span>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1">
+                    <Clock size={10} />
+                    {getCreatedDate().toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center">
+                    <UserIcon size={12} className="text-zinc-400" />
+                  </div>
+                  <p className="text-white font-bold text-sm">
+                    {shipment.createdByEmail === OWNER_EMAIL ? 'Platform Owner' : shipment.createdByEmail}
+                  </p>
+                </div>
+                <p className="text-zinc-500 text-xs leading-relaxed italic">Shipment initialized at {shipment.origin} with status "{shipment.status}"</p>
+              </div>
+            </div>
+
+            {/* History Updates */}
+            {shipment.history?.map((entry, idx) => (
+              <div key={idx} className="relative flex items-start gap-6 group">
+                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-zinc-800 border-4 border-zinc-950 z-10 shrink-0">
+                  <Clock size={18} className="text-orange-500" />
+                </div>
+                <div className="pt-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs font-black bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Status Update</span>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1">
+                      <Clock size={10} />
+                      {new Date(entry.updatedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                      <UserIcon size={12} className="text-zinc-400" />
+                    </div>
+                    <p className="text-white font-bold text-sm">
+                      {entry.updatedByEmail === OWNER_EMAIL ? 'Platform Owner' : entry.updatedByEmail}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-zinc-600 uppercase w-12">Status</span>
+                      <span className="text-xs text-orange-400 font-bold">{entry.status}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-zinc-600 uppercase w-12">Location</span>
+                      <span className="text-xs text-zinc-300 font-medium">{entry.location}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-8 bg-zinc-900/30 border-t border-zinc-900 flex justify-end">
+          <button 
+            onClick={onClose}
+            className="px-8 py-3 rounded-2xl bg-white text-black font-black text-sm hover:bg-orange-500 hover:text-white transition-all transform active:scale-95"
+          >
+            CLOSE AUDIT
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 interface EditModalProps {
   shipment: Shipment;
@@ -182,28 +292,21 @@ export default function Shipments() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const [viewingAudit, setViewingAudit] = useState<Shipment | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        fetchShipments();
-      } else {
-        setLoading(false);
-      }
+    setLoading(true);
+    const q = query(collection(db, 'shipments'), orderBy('createdAt', 'desc'), limit(50));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Shipment));
+      setShipments(data);
+      setLoading(false);
+    }, (error) => {
+      console.error("Snapshot error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'shipments');
+      setLoading(false);
     });
-
-    async function fetchShipments() {
-      try {
-        const q = query(collection(db, 'shipments'), orderBy('createdAt', 'desc'), limit(50));
-        const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Shipment));
-        setShipments(data);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'shipments');
-      } finally {
-        setLoading(false);
-      }
-    }
 
     return () => unsubscribe();
   }, []);
@@ -310,42 +413,23 @@ export default function Shipments() {
                   </td>
                   {auth.currentUser?.email === OWNER_EMAIL && (
                     <td className="px-6 py-5">
-                      <div className="flex flex-col gap-1 max-h-[100px] overflow-y-auto pr-2 scrollbar-none group/audit">
-                        {/* Creation Info */}
+                      <button 
+                        onClick={() => setViewingAudit(shipment)}
+                        className="flex flex-col gap-1 items-start group/audit hover:bg-zinc-800/50 p-2 rounded-xl transition-all border border-transparent hover:border-zinc-800"
+                      >
                         <div className="flex items-center gap-1.5 text-[10px]">
-                          <span className="text-zinc-500 font-bold uppercase truncate">By:</span>
-                          <span className="text-orange-500 font-bold truncate max-w-[80px]" title={shipment.createdByEmail}>
-                            {shipment.createdByEmail === OWNER_EMAIL ? 'Owner' : shipment.createdByEmail?.split('@')[0]}
-                          </span>
-                          <span className="text-zinc-600 font-medium ml-auto">
-                            {(() => {
-                              const date = (shipment as any).createdAt;
-                              const dt = date?.toDate ? date.toDate() : new Date(date || Date.now());
-                              return dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                            })()}
+                          <span className="text-zinc-500 font-bold uppercase">Owner:</span>
+                          <span className="text-orange-500 font-bold">
+                            {shipment.createdByEmail === OWNER_EMAIL ? 'You' : shipment.createdByEmail?.split('@')[0]}
                           </span>
                         </div>
-
-                        {/* Recent History Entries */}
-                        {shipment.history && shipment.history.length > 0 && (
-                          <div className="space-y-1 mt-1 pt-1 border-t border-zinc-800/50">
-                            {shipment.history.slice().reverse().map((entry, hIdx) => (
-                              <div key={hIdx} className="flex items-center gap-1.5 text-[10px]">
-                                <span className="text-zinc-600 font-bold uppercase">Upd:</span>
-                                <span className={cn(
-                                  "truncate max-w-[80px] font-bold",
-                                  entry.updatedByEmail === OWNER_EMAIL ? "text-orange-500/80" : "text-zinc-400"
-                                )} title={entry.updatedByEmail}>
-                                  {entry.updatedByEmail === OWNER_EMAIL ? 'Owner' : entry.updatedByEmail.split('@')[0]}
-                                </span>
-                                <span className="text-zinc-700 font-medium ml-auto">
-                                  {new Date(entry.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                        <div className="flex items-center gap-1.5">
+                          <History size={12} className="text-zinc-600 group-hover/audit:text-orange-500 transition-colors" />
+                          <span className="text-[10px] font-black text-zinc-400 group-hover/audit:text-white transition-colors">
+                            {shipment.history?.length || 0} UPDATES
+                          </span>
+                        </div>
+                      </button>
                     </td>
                   )}
                   <td className="px-6 py-5 text-right">
@@ -383,6 +467,12 @@ export default function Shipments() {
       </div>
 
       <AnimatePresence>
+        {viewingAudit && (
+          <AuditTrailModal 
+            shipment={viewingAudit}
+            onClose={() => setViewingAudit(null)}
+          />
+        )}
         {editingShipment && (
           <EditShipmentModal 
             shipment={editingShipment}
