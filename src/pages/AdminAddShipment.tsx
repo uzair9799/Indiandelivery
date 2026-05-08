@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Package, MapPin, Calendar, ClipboardList, Send, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -14,6 +14,8 @@ export default function AdminAddShipment() {
     senderName: '',
     recipientName: '',
     status: 'Pending' as ShipmentStatus,
+    shipmentType: 'Parcels',
+    paymentMode: 'Prepaid',
     lastUpdatedLocation: '',
     remarks: '',
     lastUpdatedDate: new Date().toISOString().split('T')[0],
@@ -38,6 +40,14 @@ export default function AdminAddShipment() {
       await setDoc(doc(db, 'shipments', shipmentId), {
         ...formData,
         createdAt: serverTimestamp(),
+        createdByEmail: auth.currentUser?.email || 'Unknown',
+        updatedByEmail: auth.currentUser?.email || 'Unknown',
+        history: [{
+          updatedByEmail: auth.currentUser?.email || 'Unknown',
+          updatedAt: new Date().toISOString(),
+          status: formData.status,
+          location: formData.lastUpdatedLocation || formData.origin
+        }]
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -97,8 +107,35 @@ export default function AdminAddShipment() {
                 <option value="In Transit">In Transit</option>
                 <option value="Out for Delivery">Out for Delivery</option>
                 <option value="Delivered">Delivered</option>
+                <option value="In Warehouse">In Warehouse</option>
                 <option value="Delayed">Delayed</option>
                 <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            {/* Shipment Type and Payment Mode */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Shipment Type</label>
+              <select
+                value={formData.shipmentType}
+                onChange={(e) => setFormData({ ...formData, shipmentType: e.target.value })}
+                className="w-full bg-black/50 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500/50 outline-none appearance-none"
+              >
+                <option value="Documents">Documents</option>
+                <option value="Parcels">Parcels</option>
+                <option value="Fragile">Fragile</option>
+                <option value="Electronics">Electronics</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Payment Mode</label>
+              <select
+                value={formData.paymentMode}
+                onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                className="w-full bg-black/50 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500/50 outline-none appearance-none"
+              >
+                <option value="Prepaid">Prepaid</option>
+                <option value="COD">Cash on Delivery (COD)</option>
               </select>
             </div>
 

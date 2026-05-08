@@ -9,13 +9,17 @@
         "senderName": { "type": "string" },
         "recipientName": { "type": "string" },
         "status": { "type": "string" },
+        "shipmentType": { "type": "string" },
+        "paymentMode": { "type": "string" },
         "lastUpdatedLocation": { "type": "string" },
         "remarks": { "type": "string" },
         "lastUpdatedDate": { "type": "string", "format": "date-time" },
         "estimatedDeliveryDate": { "type": "string", "format": "date-time" },
         "origin": { "type": "string" },
         "destination": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdByEmail": { "type": "string", "description": "Email of the user who created this shipment" },
+        "updatedByEmail": { "type": "string", "description": "Email of the user who last updated this shipment" }
       },
       "required": ["trackingNumber", "status"]
     }

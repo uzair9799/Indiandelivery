@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, MapPin, Truck, Calendar, Clock, AlertCircle, ArrowRight, User, UserCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, MapPin, Truck, Calendar, Clock, AlertCircle, ArrowRight, User, UserCheck, Package, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -43,6 +43,7 @@ export default function PublicTracking() {
       case 'Out for Delivery': return 'text-orange-500';
       case 'Delayed': return 'text-rose-500';
       case 'Pending': return 'text-orange-500';
+      case 'In Warehouse': return 'text-amber-500';
       default: return 'text-zinc-500';
     }
   };
@@ -187,6 +188,29 @@ export default function PublicTracking() {
                 <div>
                   <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest leading-none mb-1">Recipient</p>
                   <p className="text-white font-bold text-lg">{shipment.recipientName}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Shipment Type and Payment Mode Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl p-6 backdrop-blur-md flex items-center gap-5">
+                <div className="w-10 h-10 bg-zinc-800/50 rounded-xl flex items-center justify-center border border-zinc-700 shrink-0">
+                  <Package className="text-zinc-500" size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest leading-none mb-1">Shipment Type</p>
+                  <p className="text-zinc-300 font-bold text-base">{shipment.shipmentType || 'Standard Parcel'}</p>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl p-6 backdrop-blur-md flex items-center gap-5">
+                <div className="w-10 h-10 bg-emerald-500/5 rounded-xl flex items-center justify-center border border-emerald-500/10 shrink-0">
+                  <CreditCard className="text-emerald-500/70" size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest leading-none mb-1">Mode of Payment</p>
+                  <p className="text-emerald-500/90 font-bold text-base">{shipment.paymentMode || 'Prepaid'}</p>
                 </div>
               </div>
             </div>

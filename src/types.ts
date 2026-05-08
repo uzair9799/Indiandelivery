@@ -1,4 +1,4 @@
-export type ShipmentStatus = 'In Transit' | 'Delivered' | 'Pending' | 'Delayed' | 'Cancelled' | 'Out for Delivery';
+export type ShipmentStatus = 'In Transit' | 'Delivered' | 'Pending' | 'Delayed' | 'Cancelled' | 'Out for Delivery' | 'In Warehouse';
 
 export interface Shipment {
   id: string;
@@ -8,11 +8,21 @@ export interface Shipment {
   origin: string;
   destination: string;
   status: ShipmentStatus;
+  shipmentType?: string;
+  paymentMode?: string;
   lastUpdatedLocation: string;
   remarks: string;
   lastUpdatedDate: string;
   estimatedDeliveryDate: string;
   createdAt: string;
+  createdByEmail?: string;
+  updatedByEmail?: string;
+  history?: Array<{
+    updatedByEmail: string;
+    updatedAt: string;
+    status: ShipmentStatus;
+    location: string;
+  }>;
 }
 
 export interface TrackingEvent {

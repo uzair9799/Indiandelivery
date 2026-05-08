@@ -1,13 +1,14 @@
 import { Search, Filter, MoreHorizontal, ArrowRight, ExternalLink, Loader2, Edit2, X, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import { Shipment, ShipmentStatus } from '../types';
 import { onAuthStateChanged } from 'firebase/auth';
+import { OWNER_EMAIL } from '../constants';
 
-const STATUS_OPTIONS: ShipmentStatus[] = ['Pending', 'In Transit', 'Out for Delivery', 'Delivered', 'Delayed', 'Cancelled'];
+const STATUS_OPTIONS: ShipmentStatus[] = ['Pending', 'In Transit', 'Out for Delivery', 'Delivered', 'Delayed', 'Cancelled', 'In Warehouse'];
 
 interface EditModalProps {
   shipment: Shipment;
@@ -25,16 +26,32 @@ function EditShipmentModal({ shipment, onClose, onSave }: EditModalProps) {
     setError(null);
     try {
       const shipmentRef = doc(db, 'shipments', shipment.id);
+      const historyEntry = {
+        updatedByEmail: auth.currentUser?.email || 'Unknown',
+        updatedAt: new Date().toISOString(),
+        status: formData.status,
+        location: formData.lastUpdatedLocation,
+      };
+
       const updateData = {
         ...formData,
         lastUpdatedDate: new Date().toISOString(),
         updatedAt: serverTimestamp(),
+        updatedByEmail: auth.currentUser?.email || 'Unknown',
+        history: arrayUnion(historyEntry),
       };
-      // Remove id from update data
-      const { id, ...dataToSave } = updateData;
+      // Remove id and local history from update data (we use arrayUnion for db)
+      const { id, history, ...dataToSave } = updateData;
       
       await updateDoc(shipmentRef, dataToSave);
-      onSave(updateData);
+      
+      // Update local state by appending to the copy
+      const localUpdated = { 
+        ...updateData, 
+        history: [...(shipment.history || []), historyEntry] 
+      } as Shipment;
+      
+      onSave(localUpdated);
       onClose();
     } catch (err: any) {
       console.error("Update failed:", err);
@@ -99,6 +116,32 @@ function EditShipmentModal({ shipment, onClose, onSave }: EditModalProps) {
                 onChange={(e) => setFormData({ ...formData, estimatedDeliveryDate: e.target.value })}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Shipment Type</label>
+              <select 
+                value={formData.shipmentType || 'Parcels'}
+                onChange={(e) => setFormData({ ...formData, shipmentType: e.target.value })}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              >
+                <option value="Documents">Documents</option>
+                <option value="Parcels">Parcels</option>
+                <option value="Fragile">Fragile</option>
+                <option value="Electronics">Electronics</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Payment Mode</label>
+              <select 
+                value={formData.paymentMode || 'Prepaid'}
+                onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              >
+                <option value="Prepaid">Prepaid</option>
+                <option value="COD">Cash on Delivery (COD)</option>
+              </select>
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -171,6 +214,7 @@ export default function Shipments() {
       case 'Delayed': return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
       case 'Pending': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
       case 'Out for Delivery': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
+      case 'In Warehouse': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
       default: return 'text-zinc-500 bg-zinc-500/10 border-zinc-500/20';
     }
   };
@@ -206,6 +250,9 @@ export default function Shipments() {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Origin / Destination</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Status</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Est. Delivery</th>
+                {auth.currentUser?.email === OWNER_EMAIL && (
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-orange-500/70">Audit Trail</th>
+                )}
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500 text-right">Actions</th>
               </tr>
             </thead>
@@ -261,6 +308,46 @@ export default function Shipments() {
                   <td className="px-6 py-5">
                     <span className="text-sm text-zinc-400">{shipment.estimatedDeliveryDate}</span>
                   </td>
+                  {auth.currentUser?.email === OWNER_EMAIL && (
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col gap-1 max-h-[100px] overflow-y-auto pr-2 scrollbar-none group/audit">
+                        {/* Creation Info */}
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="text-zinc-500 font-bold uppercase truncate">By:</span>
+                          <span className="text-orange-500 font-bold truncate max-w-[80px]" title={shipment.createdByEmail}>
+                            {shipment.createdByEmail === OWNER_EMAIL ? 'Owner' : shipment.createdByEmail?.split('@')[0]}
+                          </span>
+                          <span className="text-zinc-600 font-medium ml-auto">
+                            {(() => {
+                              const date = (shipment as any).createdAt;
+                              const dt = date?.toDate ? date.toDate() : new Date(date || Date.now());
+                              return dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                            })()}
+                          </span>
+                        </div>
+
+                        {/* Recent History Entries */}
+                        {shipment.history && shipment.history.length > 0 && (
+                          <div className="space-y-1 mt-1 pt-1 border-t border-zinc-800/50">
+                            {shipment.history.slice().reverse().map((entry, hIdx) => (
+                              <div key={hIdx} className="flex items-center gap-1.5 text-[10px]">
+                                <span className="text-zinc-600 font-bold uppercase">Upd:</span>
+                                <span className={cn(
+                                  "truncate max-w-[80px] font-bold",
+                                  entry.updatedByEmail === OWNER_EMAIL ? "text-orange-500/80" : "text-zinc-400"
+                                )} title={entry.updatedByEmail}>
+                                  {entry.updatedByEmail === OWNER_EMAIL ? 'Owner' : entry.updatedByEmail.split('@')[0]}
+                                </span>
+                                <span className="text-zinc-700 font-medium ml-auto">
+                                  {new Date(entry.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button 
