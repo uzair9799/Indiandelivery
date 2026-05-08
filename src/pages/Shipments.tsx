@@ -51,55 +51,60 @@ function AuditTrailModal({ shipment, onClose }: AuditTrailModalProps) {
               </div>
               <div className="pt-2">
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-xs font-black bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-md uppercase tracking-tighter">Initial Creation</span>
+                  <span className="text-[10px] font-black bg-orange-500 text-orange-950 px-2 py-0.5 rounded uppercase tracking-tighter">Genesis Event</span>
                   <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1">
                     <Clock size={10} />
-                    {getCreatedDate().toLocaleString()}
+                    {getCreatedDate().toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-md bg-zinc-800 flex items-center justify-center border border-zinc-700">
                     <UserIcon size={12} className="text-zinc-400" />
                   </div>
                   <p className="text-white font-bold text-sm">
-                    {shipment.createdByEmail === OWNER_EMAIL ? 'Platform Owner' : shipment.createdByEmail}
+                    {shipment.createdByEmail === OWNER_EMAIL ? 'Platform Owner' : (shipment.createdByEmail || 'Shipment System')}
                   </p>
                 </div>
-                <p className="text-zinc-500 text-xs leading-relaxed italic">Shipment initialized at {shipment.origin} with status "{shipment.status}"</p>
+                <p className="text-zinc-500 text-[11px] leading-relaxed italic border-l-2 border-zinc-800 pl-3">Shipment record generated at {shipment.origin} with initial status "{shipment.status}".</p>
               </div>
             </div>
 
             {/* History Updates */}
-            {shipment.history?.map((entry, idx) => (
+            {shipment.history?.slice().reverse().map((entry, idx) => (
               <div key={idx} className="relative flex items-start gap-6 group">
-                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-zinc-800 border-4 border-zinc-950 z-10 shrink-0">
-                  <Clock size={18} className="text-orange-500" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-zinc-900 border-4 border-zinc-950 z-10 shrink-0">
+                  <div className="w-2 h-2 rounded-full bg-orange-500" />
                 </div>
-                <div className="pt-2">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs font-black bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Status Update</span>
+                <div className="pt-2 flex-grow bg-zinc-900/40 rounded-2xl p-4 border border-zinc-800/50">
+                  <div className="flex items-center justify-between mb-3 border-b border-zinc-800 pb-2">
+                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-tighter">Status Change</span>
                     <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1">
                       <Clock size={10} />
-                      {new Date(entry.updatedAt).toLocaleString()}
+                      {new Date(entry.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
-                      <UserIcon size={12} className="text-zinc-400" />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Update By</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                          <UserIcon size={10} className="text-zinc-400" />
+                        </div>
+                        <p className="text-white font-bold text-xs truncate max-w-[100px]">
+                          {entry.updatedByEmail === OWNER_EMAIL ? 'Owner' : entry.updatedByEmail.split('@')[0]}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-white font-bold text-sm">
-                      {entry.updatedByEmail === OWNER_EMAIL ? 'Platform Owner' : entry.updatedByEmail}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">New Status</p>
+                      <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-500 font-black text-[10px] uppercase">{entry.status}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-zinc-600 uppercase w-12">Status</span>
-                      <span className="text-xs text-orange-400 font-bold">{entry.status}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-zinc-600 uppercase w-12">Location</span>
-                      <span className="text-xs text-zinc-300 font-medium">{entry.location}</span>
-                    </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-zinc-800/50">
+                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-1">New Location</p>
+                    <p className="text-zinc-400 text-xs font-medium">{entry.location || 'Not specified'}</p>
                   </div>
                 </div>
               </div>
@@ -413,23 +418,31 @@ export default function Shipments() {
                   </td>
                   {auth.currentUser?.email === OWNER_EMAIL && (
                     <td className="px-6 py-5">
-                      <button 
-                        onClick={() => setViewingAudit(shipment)}
-                        className="flex flex-col gap-1 items-start group/audit hover:bg-zinc-800/50 p-2 rounded-xl transition-all border border-transparent hover:border-zinc-800"
-                      >
-                        <div className="flex items-center gap-1.5 text-[10px]">
-                          <span className="text-zinc-500 font-bold uppercase">Owner:</span>
-                          <span className="text-orange-500 font-bold">
-                            {shipment.createdByEmail === OWNER_EMAIL ? 'You' : shipment.createdByEmail?.split('@')[0]}
+                      <div className="flex flex-col gap-1.5 min-w-[140px]">
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <div className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></div>
+                          <span className="text-zinc-500 font-bold uppercase whitespace-nowrap">Created by</span>
+                          <span className="text-orange-500 font-bold ml-auto truncate max-w-[60px]" title={shipment.createdByEmail}>
+                            {shipment.createdByEmail === OWNER_EMAIL ? 'You' : (shipment.createdByEmail?.split('@')[0] || 'System')}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <History size={12} className="text-zinc-600 group-hover/audit:text-orange-500 transition-colors" />
-                          <span className="text-[10px] font-black text-zinc-400 group-hover/audit:text-white transition-colors">
-                            {shipment.history?.length || 0} UPDATES
+                        
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-600"></div>
+                          <span className="text-zinc-500 font-bold uppercase whitespace-nowrap">Hist. Logs</span>
+                          <span className="text-zinc-300 font-bold ml-auto">
+                            {shipment.history?.length || 0}
                           </span>
                         </div>
-                      </button>
+
+                        <button 
+                          onClick={() => setViewingAudit(shipment)}
+                          className="text-[10px] font-black text-orange-500/70 hover:text-orange-500 border border-orange-500/20 hover:border-orange-500/50 bg-orange-500/5 rounded-lg px-2 py-1 uppercase tracking-widest flex items-center justify-center gap-1.5 mt-1 transition-all"
+                        >
+                          <History size={10} />
+                          View Timeline
+                        </button>
+                      </div>
                     </td>
                   )}
                   <td className="px-6 py-5 text-right">

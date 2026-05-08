@@ -42,12 +42,7 @@ export default function AdminAddShipment() {
         createdAt: serverTimestamp(),
         createdByEmail: auth.currentUser?.email || 'Unknown',
         updatedByEmail: auth.currentUser?.email || 'Unknown',
-        history: [{
-          updatedByEmail: auth.currentUser?.email || 'Unknown',
-          updatedAt: new Date().toISOString(),
-          status: formData.status,
-          location: formData.lastUpdatedLocation || formData.origin
-        }]
+        history: []
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
